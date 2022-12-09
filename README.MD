@@ -1,0 +1,1 @@
+This program uses ctypes to call functions from a native DLL, allowing for injection of DLLs into target processes. The injection mode and launch method can be specified, as well as a timeout for DllMain and a flag to generate error logs.
