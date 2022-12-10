@@ -46,13 +46,14 @@ class DLLUpdater:
         :return: True if the file was unzipped, False if it failed
         """
         try:
+            import zipfile
             with zipfile.ZipFile(filename, "r") as zip_ref:
                 if logging:
                     for name in zip_ref.namelist():
                         print(f"[+] Extracting: {name}")
                 zip_ref.extractall(os.path.dirname(filename))
-            print("[+] Unzipped file: " + filename)
             os.remove(filename)
+            print("[+] Unzipped, and removed file: " + filename)
             return True
         except zipfile.BadZipFile as e:
             print(f"[-] Failed to unzip file: {filename}")
@@ -64,38 +65,36 @@ class DLLUpdater:
         :param url: The url to the github releases page
         :return: True if the file was downloaded, False if it failed
         """
+        if "/releases/" not in url:
+            url += "/releases/latest/"
+            print("[+] Using url: " + url)
         response = requests.get(url)
+        # get the new url from the redirect
+        url = response.url.replace("tag", "expanded_assets")
+        response = requests.get(url)
+
+        # loop through all links and look for one that contains "expanded_assets"
         soup = BeautifulSoup(response.text, "html.parser")
-        # find the most recent tag using the (a class "Link--muted")
-        href = None
-        new_url = None
-        try:
-            # class = Truncate
-            tags = soup.find_all("a")
-            for tag in tags:
-                print(tag.text)
-                href = tag["href"]
-                if "releases/tag" in href:
-                    new_url = url.split('.com')[0]+'.com'+href
-                    print(f"[+] Found latest release on: {new_url}")
-                    break
-        except AttributeError as e:
-            print(f"[-] Failed to find any releases on: {url}")
+        asset_links = soup.find_all("a")
+        for asset_link in asset_links:
+            if "download" in asset_link["href"]:
+                print("[+] Attemping to download latest release: " + "https://github.com" + asset_link["href"])
+                response = requests.get("https://github.com" + asset_link["href"])
+                break
+        else:
+            print("[-] Failed to find latest release")
             return False
-        if new_url is None:
-            print(f"[-] Failed to find any releases on: {response.url}")
-            return False
-        response = requests.get(new_url)
-        print("[+] Downloading latest release: " + response.url)
-        filename = response.url.split("/")[-1]
+        # download the file
         if response.ok:
+            filename = url.split("/")[-1]
             print("[+] Downloaded latest release: " + filename)
             with open(filename, "wb") as f:
                 f.write(response.content)
-            unzip_file(filename)           
+            DLLUpdater.unzip_file(filename, logging=True)           
         else:
             print("[-] Failed to download: " + filename)
             return False
+
 
     def download_pdb_files(url:str)->bool:
         """
@@ -118,8 +117,6 @@ class DLLUpdater:
             return False
 
 
-
-
 if __name__ == "__main__":
     # print the docstring for the function
     DLLUpdater.check_updates("https://github.com/Broihon/GH-Injector-Library/blob/master/Injection.h")
@@ -131,4 +128,4 @@ if __name__ == "__main__":
         DLLUpdater.download_pdb_files(wntdll)
         DLLUpdater.download_pdb_files(ntdll)
     if "GH Injector - x64.dll" and "GH Injector - x86.dll" not in os.listdir():
-        DLLUpdater.download_latest_release("https://github.com/Broihon/GH-Injector-Library/releases/latest")
+        DLLUpdater.download_latest_release("https://github.com/Broihon/GH-Injector-Library/")

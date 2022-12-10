@@ -6,6 +6,7 @@ import threading
 import ctypes
 import psutil
 import re
+from functools import reduce
 from update_checker import DLLUpdater
 
 
@@ -23,6 +24,7 @@ CLOAKING_OPTIONS = {"INJ_ERASE_HEADER": 0x0001, # replaces the first 0x1000 byte
                     "INJ_LOAD_DLL_COPY": 0x0020, # loads a copy of the dll from %temp% directory
                     "INJ_HIJACK_HANDLE": 0x0040} # tries to a hijack a handle from another process instead of using OpenProcess
 
+# convert cloaking options keys to a list
 MANUAL_MAP_OPTIONS = {"INJ_MM_CLEAN_DATA_DIR": 0x00010000, # removes data from the dlls PE header, ignored if INJ_MM_SET_PAGE_PROTECTIONS is set
                     "INJ_MM_RESOLVE_IMPORTS": 0x00020000, # resolves dll imports
                     "INJ_MM_RESOLVE_DELAY_IMPORTS": 0x00040000, # resolves delayed imports
@@ -132,7 +134,7 @@ class LAUNCH_METHOD(ctypes.c_int):
     USER_DEFINED = 0
 
 
-def Inject(injectable_dll, target_pid, generate_log, _launch_method, _injection_mode, cloak_methods):
+def Inject(injectable_dll, target_pid, generate_log, _launch_method, _injection_mode, map_options, cloak_methods, timeout):
     # Import the "GH Injector - x86.dll" library using ctypes
     current_dir = os.path.dirname(os.path.abspath(__file__))
     gh_injector_dll_path = current_dir + os.path.sep + "GH Injector - x64.dll"
@@ -169,17 +171,21 @@ def Inject(injectable_dll, target_pid, generate_log, _launch_method, _injection_
     info.ProcessID = target_pid
     info.Mode = INJECTION_MODE.USER_DEFINED
     info.Method = LAUNCH_METHOD.USER_DEFINED
-    # set the flags with MM_DEFAULT
-    info.Flags = ctypes.c_uint32(MM_DEFAULT)
-    info.Timeout = 0
+    # combine the map options with the cloak methods
+    info.Flags = (map_options | cloak_methods) if cloak_methods or map_options else 0
+    print(f"{COLORS.GREEN}[*] Flags: {info.Flags}{COLORS.END}")
+    info.Timeout = timeout
     info.hHandleValue = 0
     info.hDllOut = ctypes.c_void_p()
     info.GenerateErrorLog = generate_log
 
-    # Start the download process if the symbol and import files are not present
-    if "ntdll.dll" not in os.listdir(current_dir) or "kernel32.dll" not in os.listdir(current_dir):
+    # check if x64 is a directory
+    if "x64" not in os.listdir(current_dir):
+        os.mkdir(current_dir + os.path.sep + 'x64')
+    if "ntdll.pdb" not in os.listdir(current_dir + os.path.sep + 'x64'):
+        print(f"{COLORS.GREEN}Downloading symbols and imports...{COLORS.END}")
         GH_INJECTOR_DLL.StartDownload()
-    
+
     # Wait until the symbol and import states are ready
     waited_time = 0
     while GH_INJECTOR_DLL.GetSymbolState() != 0:
@@ -188,22 +194,22 @@ def Inject(injectable_dll, target_pid, generate_log, _launch_method, _injection_
         if waited_time > 600:
             print("Error: Could not download symbols")
             os._exit(1)
-        waited_time += 1
     while GH_INJECTOR_DLL.GetImportState() != 0:
         time.sleep(0.1)
         # If the download process takes more than 1 minute, stop the script
         if waited_time > 600:
             print("Error: Could not download imports")
             os._exit(1)
-        waited_time += 1
+
+    # Start the download process if the symbol and import files are not present
+    # walk the dirpath
+    #if "ntdll.dll" not in os.listdir(current_dir) or "ntdll.imports" not in os.listdir(current_dir):
+        #GH_INJECTOR_DLL.StartDownload()
+   
     
     # Inject the DLL into the target process
     success = Inject(ctypes.byref(info))
-    if success:
-        print("Injection successful!")
-    else:
-        print("Injection failed!")
-
+    print(f"{COLORS.GREEN}[+] Attempted Injection!{COLORS.END}")
 
 class COLORS:
     RED = "\033[31m"
@@ -219,8 +225,8 @@ class COLORS:
 if __name__ == "__main__":
     lookup_mode_action = lambda x: INJECT_MODE_OPTIONS[x] if x in INJECT_MODE_OPTIONS else 0
     lookup_launch_action = lambda x: LAUNCH_METHOD_OPTIONS[x] if x in LAUNCH_METHOD_OPTIONS else 0
-    lookup_manual_map_option = lambda x: MANUAL_MAP_OPTIONS[x] if x in MANUAL_MAP_OPTIONS else None
-    lookup_cloak_method = lambda x: CLOAKING_OPTIONS[x] if x in CLOAKING_OPTIONS else None
+    lookup_manual_map_option = lambda x: MANUAL_MAP_OPTIONS[x] if x in MANUAL_MAP_OPTIONS else 0
+    lookup_cloak_method = lambda x: CLOAKING_OPTIONS[x] if x in CLOAKING_OPTIONS else 0
     parser = argparse.ArgumentParser(description=f"{COLORS.YELLOW}ProcessMarauder - A Python library for DLL injection, built off of the GH Injector DLL{COLORS.END}", formatter_class=argparse.RawTextHelpFormatter)
     # allow relative paths for the DLL to inject
     # use a mandatory group for both the DLL to inject and the target process ID so the user has to specify both
@@ -237,22 +243,20 @@ if __name__ == "__main__":
     optional_group.add_argument("-m", help="The injection mode to use, defaults to IM_LoadLibraryExW", default="IM_LoadLibraryExW", required=False, choices=INJECT_MODE_OPTIONS.keys())
     optional_group.add_argument("-l", help="The launch method to use, defaults to LM_NtCreateThreadEx", default="LM_NtCreateThreadEx", required=False, choices=LAUNCH_METHOD_OPTIONS.keys())
     optional_group.add_argument("--generate_error_log", "-e", action="store_true", help="Generate an error log if the injection fails, defaults to True", default=True, required=False)
-    optional_group.add_argument('--cloak_options', default=None, required=False, choices=CLOAKING_OPTIONS.keys(), help="The cloak method to use, defaults to None, multiple cloak methods can be specified by separating them with a comma", nargs='?')
-    optional_group.add_argument("--manual_map_options", help="Options when manually mapping a DLL, only available if -m is set to IM_ManualMap, multiple options can be specified by separating them with a comma", default=None, required=False, choices=MANUAL_MAP_OPTIONS.keys(), nargs='?')
+    optional_group.add_argument('--cloak_options', default=None, required=False, choices=list(CLOAKING_OPTIONS), help="The cloak method to use, defaults to None, multiple cloak methods can be specified by separating them with a comma", nargs='+')
+    optional_group.add_argument("--manual_map_options", help="Options when manually mapping a DLL, only available if -m is set to IM_ManualMap, multiple options can be specified by separating them with a comma", required=False, choices=list(MANUAL_MAP_OPTIONS), nargs='+')
+    optional_group.add_argument("--wait", '-w', help="The delay in milliseconds to wait before manually mapping a DLL", default=5000, required=False, type=int)
 
     # ignore errors if the user doesn't specify the DLL to inject or the target process ID, but still show the help message
     parser.error = lambda message: None
     # color the usage message green if a word starts with -- or -
     old_usage = parser.format_usage().replace("usage: ", '')
     parser.usage = re.sub(r"(-+\w+)", f"{COLORS.YELLOW}\\1{COLORS.END}", old_usage).replace("ProcessMarauder.py", f"{COLORS.GREEN}ProcessMarauder.py{COLORS.END}")
-    # add a custom example of how to use the script
     parser.epilog = f"Example 1: {COLORS.GREEN}{sys.argv[0]}{COLORS.YELLOW} -i an_injectable.dll -t notepad.exe -m IM_ManualMap -l LM_NtCreateThreadEx --cloak_options INJ_FAKE_HEADER, INJ_UNLINK_FROM_PEB, INJ_THREAD_CREATE_CLOAKED{COLORS.END}"
-    # add a second parser epilog
     parser.epilog += f"\nExample 2: {COLORS.GREEN}{sys.argv[0]}{COLORS.YELLOW} -i \"C:\\Users\\user\\Desktop\\an_injectable.dll\" -p 1234 -m IM_LoadLibraryExW -l LM_HijackThread --cloak_options INJ_UNLINK_FROM_PEB, INJ_THREAD_CREATE_CLOAKED{COLORS.END}"
-    # add a third parser epilog
-    parser.epilog += f"\nExample 3: {COLORS.GREEN}{sys.argv[0]}{COLORS.YELLOW} -i ..\\..\\an_injectable.dll -t notepad.exe -m IM_LoadLibraryExW -l LM_NtCreateThreadEx{COLORS.END}"
-    # add a fourth parser epilog
-    parser.epilog += f"\nExample 4: {COLORS.GREEN}{sys.argv[0]}{COLORS.YELLOW} -b -d{COLORS.END}"
+    parser.epilog += f"\nExample 3: {COLORS.GREEN}{sys.argv[0]}{COLORS.YELLOW} -i ..\\..\\an_injectable.dll -t notepad.exe{COLORS.END}"
+    parser.epilog += f"\nExample 4: {COLORS.GREEN}{sys.argv[0]}{COLORS.YELLOW} -i ..\ByteMarauder\dlls\calc_x64.dll -t notepad.exe --cloak_options INJ_LOAD_DLL_COPY INJ_SCRAMBLE_DLL_NAME INJ_UNLINK_FROM_PEB INJ_ERASE_HEADER --manual_map_options INJ_MM_RESOLVE_DELAY_IMPORTS INJ_MM_SET_PAGE_PROTECTIONS -l LM_NtCreateThreadEx -m IM_ManualMap{COLORS.END}"
+    parser.epilog += f"\nExample 5: {COLORS.GREEN}{sys.argv[0]}{COLORS.YELLOW} -b -d{COLORS.END}"
     # show a custom help message listing the available injection modes and launch methods
     # show a custom error if the user picked both a target process ID and a target process name
     args = parser.parse_args()
@@ -274,20 +278,26 @@ if __name__ == "__main__":
     if args.download_injector_dlls:
         DLLUpdater.download_latest_release("https://github.com/Broihon/GH-Injector-Library/releases/latest")
     if args.download_pdbs:
+        # make a x86 and x64 folder in the current directory
+        os.makedirs("x86", exist_ok=True)
+        os.makedirs("x64", exist_ok=True)
         wntdll = "https://msdl.microsoft.com/download/symbols/wntdll.pdb/7EDD56F06D47FF1247F446FD1B111F2C1/wntdll.pdb"
         ntdll = "https://msdl.microsoft.com/download/symbols/ntdll.pdb/46F6F5C30E7147E46F2A953A5DAF201A1/ntdll.pdb"
         DLLUpdater.download_pdb_files(wntdll)
         DLLUpdater.download_pdb_files(ntdll)
-
-    if not os.path.exists("GH Injector - x64.dll"):
-        print(f"{COLORS.RED}GH Injector - x64.dll not found. Please download/compile it{COLORS.END}")
-        exit(1)
+        # move wntdll.pdb to the x64 folder
+        
+        os.rename("wntdll.pdb", "x86\\wntdll.pdb")
+        # move ntdll.pdb to the x86 folder
+        os.rename("ntdll.pdb", "x64\\ntdll.pdb")
+    
     if args.target_process:
         try:
             args.target_pid = [p.pid for p in psutil.process_iter() if p.name() == args.target_process][0]
         except IndexError:
             print(f"{COLORS.RED}[-] Process {args.target_process} not found{COLORS.END}")
             exit(1)
+    
     if (args.injectable_dll is not None) and (args.target_pid is not None):
         try:
             args.injectable_dll = os.path.abspath(args.injectable_dll)
@@ -304,18 +314,31 @@ if __name__ == "__main__":
             print(f"{COLORS.GREEN}[*] Setting PID: {args.target_pid} ({process_name}) as the target process ID{COLORS.END}")
             print(f"{COLORS.GREEN}[*] Setting {args.m} ({lookup_mode_action(args.m)}) as the injection mode{COLORS.END}")
             print(f"{COLORS.GREEN}[*] Setting {args.l} ({lookup_launch_action(args.l)}) as the launch method{COLORS.END}")
-            if args.cloak_methods:
-                print(f"{COLORS.GREEN}[*] Cloaking methods{COLORS.END}")
+            if args.cloak_options:
+                print(f"{COLORS.GREEN}[*] Setting {', '.join(args.cloak_options)} as the cloaking methods{COLORS.END}")
+                args.cloak_options = [lookup_cloak_method(i) for i in args.cloak_options]
+                args.cloak_options = reduce(lambda x, y: x | y, args.cloak_options)
             if args.manual_map_options:
-                print(f"{COLORS.GREEN}[*] Setting {args.manual_map_options} ({lookup_manual_map_option(args.manual_map_options)}) as the manual map option{COLORS.END}")
+                # binary or the manual map options with each other
+                print(f"{COLORS.GREEN}[*] Setting {', '.join(args.manual_map_options)} as the manual map option(s){COLORS.END}")
+                if args.wait:
+                    print(f"{COLORS.GREEN}[*] Setting {args.wait}ms as the wait time{COLORS.END}")
+                args.manual_map_options = [lookup_manual_map_option(i) for i in args.manual_map_options]
+                args.manual_map_options = reduce(lambda x, y: x | y, args.manual_map_options)
+            # combine the manual map options and the cloaking options
+            if (not os.path.exists("GH Injector - x64.dll") or not os.path.exists("GH Injector SM - x64.exe") or not os.path.exists("GH Injector - x86.dll") or not os.path.exists("GH Injector SM - x86.exe")):
+                parser.print_help()
+                print(f"{COLORS.RED}GH Injector, .dll/.exe not found. Please download/compile it (-d){COLORS.END}")
+                exit(1)
             print("")
-            main_thread = threading.Thread(target=Inject, args=(args.injectable_dll, args.target_pid, args.generate_error_log, lookup_mode_action(args.m), lookup_launch_action(args.l), args.cloak_methods))
+            main_thread = threading.Thread(target=Inject, args=(args.injectable_dll, args.target_pid, args.generate_error_log, lookup_mode_action(args.m), lookup_launch_action(args.l), args.manual_map_options, args.cloak_options, args.wait))
             main_thread.start()
             main_thread.join()
-        except KeyboardInterrupt:
-            exit(0)
+        except Exception as e:
+            print(e)
+            exit(1)
     elif not args.check_for_updates and not args.download_pdbs and not args.download_injector_dlls:
         parser.print_help()
-    if (not args.target_pid and not args.target_process or not args.injectable_dll) and len(sys.argv) > 1 and not args.download_injector_dlls:
+    elif (not args.target_pid and not args.target_process or not args.injectable_dll) and len(sys.argv) > 1 and not args.download_injector_dlls and not args.download_pdbs and not args.check_for_updates:
         print(f"{COLORS.RED}You must specify a target process ID or a target process name, and a DLL to inject!{COLORS.END}")
         exit(1)
