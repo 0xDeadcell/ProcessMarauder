@@ -1,1 +1,5 @@
-This program uses ctypes to call functions from a native DLL, allowing for injection of DLLs into target processes. The injection mode and launch method can be specified, as well as a timeout for DllMain and a flag to generate error logs.
+ProcessMarauder is a Python library for DLL injection, built off of the GH Injector DLL. It provides a command line interface for injecting DLLs into running processes and includes optional arguments for specifying the injection mode, launch method, and cloaking options. The library also offers the ability to download PDB files and DLLs for the GH Injector library, and to check for updates to the library. It requires the user to specify the path to the DLL to inject and the ID or name of the target process.
+
+Big s/o to https://github.com/Broihon/GH-Injector-Library
+
+![Command Usage](/usage.png)
