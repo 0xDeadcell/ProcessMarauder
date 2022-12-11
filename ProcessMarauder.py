@@ -327,7 +327,9 @@ if __name__ == "__main__":
     
     if args.target_process:
         try:
-            args.target_pid = [p.pid for p in psutil.process_iter() if p.name() == args.target_process][-1]
+            # search for p.name using regex from the target_process argument
+            print(f"{COLORS.GREEN}[*] Searching processes matching {args.target_process}{COLORS.END}")
+            args.target_pid = [p.pid for p in psutil.process_iter() if re.search(args.target_process, p.name(), re.IGNORECASE|re.DOTALL)][-1]
         except IndexError:
             print(f"{COLORS.RED}[-] Process {args.target_process} not found{COLORS.END}")
             exit(1)
