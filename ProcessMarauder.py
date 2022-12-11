@@ -219,6 +219,16 @@ class COLORS:
     MAGENTA = "\033[35m"
     CYAN = "\033[36m"
     WHITE = "\033[37m"
+    BRIGHT_RED = "\033[31;1m"
+    BRIGHT_GREEN = "\033[32;1m"
+    BRIGHT_YELLOW = "\033[33;1m"
+    BRIGHT_BLUE = "\033[34;1m"
+    BG_GREEN = "\033[42m"
+    BG_BRIGHT_RED = "\033[41;1m"
+    BG_BRIGHT_GREEN = "\033[42;1m"
+    BG_BRIGHT_YELLOW = "\033[43;1m"
+    BG_BRIGHT_BLUE = "\033[44;1m"
+    BG_WHITE = "\033[47m"
     END = "\033[0m"
 
 
@@ -250,6 +260,30 @@ if __name__ == "__main__":
     # ignore errors if the user doesn't specify the DLL to inject or the target process ID, but still show the help message
     parser.error = lambda message: None
     # color the usage message green if a word starts with -- or -
+    banner = """                                                                                                                                                          
+@@@@@@@   @@@@@@@    @@@@@@    @@@@@@@  @@@@@@@@   @@@@@@    @@@@@@      @@@@@@@@@@    @@@@@@   @@@@@@@    @@@@@@   @@@  @@@  @@@@@@@   @@@@@@@@  @@@@@@@   
+@@@@@@@@  @@@@@@@@  @@@@@@@@  @@@@@@@@  @@@@@@@@  @@@@@@@   @@@@@@@      @@@@@@@@@@@  @@@@@@@@  @@@@@@@@  @@@@@@@@  @@@  @@@  @@@@@@@@  @@@@@@@@  @@@@@@@@  
+@@!  @@@  @@!  @@@  @@!  @@@  !@@       @@!       !@@       !@@          @@! @@! @@!  @@!  @@@  @@!  @@@  @@!  @@@  @@!  @@@  @@!  @@@  @@!       @@!  @@@  
+!@!  @!@  !@!  @!@  !@!  @!@  !@!       !@!       !@!       !@!          !@! !@! !@!  !@!  @!@  !@!  @!@  !@!  @!@  !@!  @!@  !@!  @!@  !@!       !@!  @!@  
+@!@@!@!   @!@!!@!   @!@  !@!  !@!       @!!!:!    !!@@!!    !!@@!!       @!! !!@ @!@  @!@!@!@!  @!@!!@!   @!@!@!@!  @!@  !@!  @!@  !@!  @!!!:!    @!@!!@!   
+!!@!!!    !!@!@!    !@!  !!!  !!!       !!!!!:     !!@!!!    !!@!!!      !@!   ! !@!  !!!@!!!!  !!@!@!    !!!@!!!!  !@!  !!!  !@!  !!!  !!!!!:    !!@!@!    
+!!:       !!: :!!   !!:  !!!  :!!       !!:            !:!       !:!     !!:     !!:  !!:  !!!  !!: :!!   !!:  !!!  !!:  !!!  !!:  !!!  !!:       !!: :!!   
+:!:       :!:  !:!  :!:  !:!  :!:       :!:           !:!       !:!      :!:     :!:  :!:  !:!  :!:  !:!  :!:  !:!  :!:  !:!  :!:  !:!  :!:       :!:  !:!  
+ ::       ::   :::  ::::: ::   ::: :::   :: ::::  :::: ::   :::: ::      :::     ::   ::   :::  ::   :::  ::   :::  ::::: ::   :::: ::   :: ::::  ::   :::  
+ :         :   : :   : :  :    :: :: :  : :: ::   :: : :    :: : :        :      :     :   : :   :   : :   :   : :   : :  :   :: :  :   : :: ::    :   : :  
+                                                                                                                                                            
+
+
+"""
+    # for each line in the banner, color the a lighter shade of green, start with the first line being the darkest shade of green, then end with the last lines being dark, then bright red.
+    for i, line in enumerate(banner.splitlines()):
+        if i < 6:
+            print(f"{COLORS.GREEN}{line}{COLORS.END}")
+        elif i < 8:
+            print(f"{COLORS.RED}{line}{COLORS.END}")
+        else:
+            print(f"{COLORS.BRIGHT_RED}{line}{COLORS.END}")
+
     old_usage = parser.format_usage().replace("usage: ", '')
     parser.usage = re.sub(r"(-+\w+)", f"{COLORS.YELLOW}\\1{COLORS.END}", old_usage).replace("ProcessMarauder.py", f"{COLORS.GREEN}ProcessMarauder.py{COLORS.END}")
     parser.epilog = f"Example 1: {COLORS.GREEN}{sys.argv[0]}{COLORS.YELLOW} -i an_injectable.dll -t notepad.exe -m IM_ManualMap -l LM_NtCreateThreadEx --cloak_options INJ_FAKE_HEADER, INJ_UNLINK_FROM_PEB, INJ_THREAD_CREATE_CLOAKED{COLORS.END}"
