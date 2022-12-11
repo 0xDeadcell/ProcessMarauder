@@ -1,4 +1,4 @@
-[!Banner Image](/images/banner.png)
+![Banner Image](/images/banner.png)
 
 
 ## DISCLAIMER
@@ -32,7 +32,7 @@ There are also several optional arguments you can use to customize the injection
 
 `--download_pdbs or -b`: Download the PDB files for the GH Injector library.
 
-`--download_injector_dlls or -d`: Download the DLLs for the GH Injector library.
+`--download_injector_dllhows or -d`: Download the DLLs for the GH Injector library.
 
 `--injectable_dll or -i`: The path to the DLL to inject.
 
