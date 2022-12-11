@@ -1,3 +1,6 @@
+[!Banner Image](/images/banner.png)
+
+
 ## DISCLAIMER
 This tool is intended for educational and research purposes only. The user is responsible for complying with all applicable laws and regulations. The creators and contributors of this tool are not responsible for any illegal or unauthorized use of this tool. Use at your own risk.
 
@@ -18,7 +21,7 @@ There are also several optional arguments you can use to customize the injection
 `python ProcessMarauder.py -i ..\an_injectable.dll -t notepad.exe -m IM_ManualMap -l LM_NtCreateThreadEx --cloak_options INJ_LOAD_DLL_COPY INJ_SCRAMBLE_DLL_NAME INJ_UNLINK_FROM_PEB INJ_ERASE_HEADER`
 
 
-![Command Usage](/usage.png)
+![Command Usage](/images/usage.png)
 ### Mandatory Arguments
 `--injectable_dll or -i`: The path to the DLL to inject.
 
