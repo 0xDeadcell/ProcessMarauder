@@ -253,8 +253,8 @@ if __name__ == "__main__":
     optional_group.add_argument("-m", help="The injection mode to use, defaults to IM_LoadLibraryExW", default="IM_LoadLibraryExW", required=False, choices=INJECT_MODE_OPTIONS.keys())
     optional_group.add_argument("-l", help="The launch method to use, defaults to LM_NtCreateThreadEx", default="LM_NtCreateThreadEx", required=False, choices=LAUNCH_METHOD_OPTIONS.keys())
     optional_group.add_argument("--generate_error_log", "-e", action="store_true", help="Generate an error log if the injection fails, defaults to True", default=True, required=False)
-    optional_group.add_argument('--cloak_options', default=None, required=False, choices=list(CLOAKING_OPTIONS), help="The cloak method to use, defaults to None, multiple cloak methods can be specified by separating them with a comma", nargs='+')
-    optional_group.add_argument("--manual_map_options", help="Options when manually mapping a DLL, only available if -m is set to IM_ManualMap, multiple options can be specified by separating them with a comma", required=False, choices=list(MANUAL_MAP_OPTIONS), nargs='+')
+    optional_group.add_argument('--cloak_options', default=0, required=False, choices=list(CLOAKING_OPTIONS), help="The cloak method to use, defaults to None, multiple cloak methods can be specified by separating them with a comma", nargs='+')
+    optional_group.add_argument("--manual_map_options", default=0, help="Options when manually mapping a DLL, only available if -m is set to IM_ManualMap, multiple options can be specified by separating them with a comma", required=False, choices=list(MANUAL_MAP_OPTIONS), nargs='+')
     optional_group.add_argument("--wait", '-w', help="The delay in milliseconds to wait before manually mapping a DLL", default=5000, required=False, type=int)
 
     # ignore errors if the user doesn't specify the DLL to inject or the target process ID, but still show the help message
@@ -327,7 +327,7 @@ if __name__ == "__main__":
     
     if args.target_process:
         try:
-            args.target_pid = [p.pid for p in psutil.process_iter() if p.name() == args.target_process][0]
+            args.target_pid = [p.pid for p in psutil.process_iter() if p.name() == args.target_process][-1]
         except IndexError:
             print(f"{COLORS.RED}[-] Process {args.target_process} not found{COLORS.END}")
             exit(1)
